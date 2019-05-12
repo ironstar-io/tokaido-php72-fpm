@@ -1,22 +1,28 @@
 FROM tokaido/php72:stable
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get update && \
-    apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+RUN echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list \
+    && wget -O- https://download.newrelic.com/548C16BF.gpg | apt-key add - \
+    && wget -O- https://packages.sury.org/php/apt.gpg | apt-key add - \
+    && apt-get update \
+    && apt -y remove apache2 \
+    && apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
       php7.2-fpm \
+      php7.2-xdebug \
+      newrelic-php5 \
       php-pear \
       python \
       python-pip \
     && pip install crudini \
     && pip install awscli  \
-    && chsh -s /bin/bash fpm \        
+    && chsh -s /bin/bash fpm \
     && mkdir -p /tokaido/logs/fpm \
     && chmod 770 /tokaido/logs/fpm \
-    && chown -R tok:web /tokaido/logs/fpm \        
+    && chown -R tok:web /tokaido/logs/fpm \
     && mkdir -p /var/log/php7 \
     && chmod 770 /var/log/php7 \
     && chown -R tok:web /var/log/php7 \
-    && chown tok:web /run/php/ \   
+    && chown tok:web /run/php/ \
     && chsh -s /usr/sbin/nologin fpm  \
     && curl -s https://getcomposer.org/installer > composer-setup.php && php composer-setup.php && mv composer.phar /usr/local/bin/composer && rm composer-setup.php  \
     && su - tok -c "/usr/local/bin/composer global require \"hirak/prestissimo\""  \
@@ -26,12 +32,14 @@ RUN apt-get update && \
     && chmod a+x /usr/local/bin/drush \
     && curl -sLo /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/2.1.2/yq_linux_amd64 \
 	  && echo "af1340121fdd4c7e8ec61b5fdd2237b40205563c6cc174e6bdab89de18fc5b97 /usr/local/bin/yq" | sha256sum -c \
-	  && chmod 777 /usr/local/bin/yq
+	  && chmod 777 /usr/local/bin/yq \
+    && chown tok:web /etc/php/7.2/mods-available/ -R \
+    && find /home/tok -type f,d -perm /g+w,o+w -a -print0 | xargs -r -0 chmod 750
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY config/php-fpm.conf /etc/php/7.2/fpm/php-fpm.conf
 COPY config/php.ini /etc/php/7.2/fpm/php.ini
-COPY config/www.conf /etc/php/7.2/fpm/pool.d/www.conf 
+COPY config/www.conf /etc/php/7.2/fpm/pool.d/www.conf
 
 RUN chown tok:web /usr/local/bin/entrypoint.sh \
     && chown tok:web /etc/php/7.2/fpm/ -R \
